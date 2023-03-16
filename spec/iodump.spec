@@ -2,11 +2,12 @@
 %define _ignore_post_scripts_errors %{nil}
 %define _enable_debug_packages %{nil}
 %define debug_package  %{nil}
-%define current_kver   %(uname -r)
+%define current_kver   %{?kver}%{!?kver:%(rpm -qa kernel-devel | head -n 1 | sed 's/^kernel-devel-//')}
+%define kver_name      %(echo %{current_kver} | awk -F. '{print substr($0,0,index($0,$(NF-1))-2)}')
 %define bare_name      iodump
 %define anolis_release 1
 
-Name:                  %{bare_name}-%{current_kver}
+Name:                  %{bare_name}-%{kver_name}
 Version:               1.0.1
 Release:               %{anolis_release}%{?dist}
 Url:                   https://gitee.com/anolis/iodump.git
