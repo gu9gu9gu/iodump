@@ -34,15 +34,17 @@ cd %{name}-%{version}
 chmod -R a+rX,u+w,g-w,o-w .
  
 %build
-cd %{name}-%{version}
+cd $RPM_BUILD_DIR/../SPECS/
 [ ! -e kiodump ] && install -d kiodump
 
+cd $RPM_BUILD_DIR
+cd %{name}-%{version}
 cd ./kernel/
 for k in $(ls /usr/src/kernels/)
 do
     make KVER=${k} clean
     make KVER=${k}
-    install kiodump.ko ./../kiodump/kiodump-${k}.ko
+    install kiodump.ko $RPM_BUILD_DIR/../SPECS/kiodump/kiodump-${k}.ko
     make KVER=${k} clean
 done
 
@@ -51,12 +53,12 @@ make
 
 %install
 BuildDir=$RPM_BUILD_DIR/%{name}-%{version}
-install -d                             %{buildroot}/usr/lib/iodump/
-install $BuildDir/kiodump/*            %{buildroot}/usr/lib/iodump/
-install -d                             %{buildroot}/usr/src/os_health/iodump/
-install $BuildDir/kernel/kiodump.conf  %{buildroot}/usr/src/os_health/iodump/kiodump.conf
-install -d                             %{buildroot}/usr/sbin/
-install $BuildDir/user/iodump          %{buildroot}/usr/sbin/iodump
+install -d                                %{buildroot}/usr/lib/iodump/
+install $RPM_BUILD_DIR/../SPECS/kiodump/* %{buildroot}/usr/lib/iodump/
+install -d                                %{buildroot}/usr/src/os_health/iodump/
+install $BuildDir/kernel/kiodump.conf     %{buildroot}/usr/src/os_health/iodump/kiodump.conf
+install -d                                %{buildroot}/usr/sbin/
+install $BuildDir/user/iodump             %{buildroot}/usr/sbin/iodump
 
 %files
 %defattr(-,root,root,-)
