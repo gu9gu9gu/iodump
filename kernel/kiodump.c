@@ -655,15 +655,12 @@ static char *get_launcher(char *lname)
 	unsigned long entries[MAX_ST_ENTRIES] = {0, };
 	char         *launcher_name;
 	char        **result;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0)
-	struct stack_trace trace;
-#endif
 
-	launcher_name = lname;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 2, 0) \
+	|| (DISTRIBUTION == DISTRIBUTION_KYLIN && defined(CONFIG_ARCH_STACKWALK))
 	nr_entries = stack_trace_save(entries, 32, 0);
 #else
+	struct stack_trace trace;
 	trace.nr_entries  = 0;
 	trace.max_entries = MAX_ST_ENTRIES;
 	trace.entries     = entries;
@@ -671,6 +668,7 @@ static char *get_launcher(char *lname)
 	save_stack_trace(&trace);
 	nr_entries        = trace.nr_entries;
 #endif
+	launcher_name = lname;
 	if (nr_entries < 2) {
 		ret = sprintf(lname, "%s", "unparsed");
 		goto end_launcher;
