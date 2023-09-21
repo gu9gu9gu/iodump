@@ -5,7 +5,7 @@
 %define current_kver   %{?kver}%{!?kver:%(rpm -qa kernel-devel | head -n 1 | sed 's/^kernel-devel-//')}
 %define kver_name      %(echo %{current_kver} | awk -F. '{print substr($0,0,index($0,$(NF-1))-2)}')
 %define bare_name      iodump
-%define anolis_release 1
+%define anolis_release 2
 
 Name:                  %{bare_name}-%{kver_name}
 Version:               1.0.1
@@ -96,6 +96,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Wed Sep 20 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-2
+- Fix compilation errors on x86 for kylin v10
+
 * Wed Aug 24 2022 MilesWen <mileswen@linux.alibaba.com> - 1.0.1-1
 - Release iodump RPM package
 --end
