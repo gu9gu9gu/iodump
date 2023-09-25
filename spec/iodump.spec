@@ -5,7 +5,7 @@
 %define current_kver   %{?kver}%{!?kver:%(rpm -qa kernel-devel | head -n 1 | sed 's/^kernel-devel-//')}
 %define kver_name      %(echo %{current_kver} | awk -F. '{print substr($0,0,index($0,$(NF-1))-2)}')
 %define bare_name      iodump
-%define anolis_release 2
+%define anolis_release 3
 
 Name:                  %{bare_name}-%{kver_name}
 Version:               1.0.1
@@ -17,6 +17,8 @@ License:               MIT
 Source0:               %{bare_name}-%{version}.tar.gz
 
 Vendor:                Alibaba
+
+BuildRequires: elfutils-devel
 
 %description
 dump the io details 
@@ -96,6 +98,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Mon Sep 25 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-3
+- Add BuildRequires: elfutils-devel
+
 * Wed Sep 20 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-2
 - Fix compilation errors on x86 for kylin v10
 

@@ -3,7 +3,7 @@
 %define _enable_debug_packages %{nil}
 %define debug_package  %{nil}
 %define all_kver       %(ls /usr/src/kernels/ | cat)
-%define anolis_release 1
+%define anolis_release 3
 
 Name:                  iodump
 Version:               1.0.1
@@ -15,6 +15,8 @@ License:               MIT
 Source0:               %{name}-%{version}.tar.gz
 
 Vendor:                Alibaba
+
+BuildRequires: elfutils-devel
 
 %description
 dump the io details 
@@ -111,6 +113,12 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Mon Sep 25 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-3
+- Add BuildRequires: elfutils-devel
+
+* Wed Sep 20 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-2
+- Fix compilation errors on x86 for kylin v10
+
 * Wed Aug 24 2022 MilesWen <mileswen@linux.alibaba.com> - 1.0.1-1
 - Release iodump RPM package
 --end
