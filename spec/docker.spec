@@ -1,9 +1,7 @@
 %global __os_install_post %{nil}
 %define _ignore_post_scripts_errors %{nil}
-%define _enable_debug_packages %{nil}
-%define debug_package  %{nil}
 %define all_kver       %(ls /usr/src/kernels/ | cat)
-%define anolis_release 3
+%define anolis_release 4
 
 Name:                  iodump
 Version:               1.0.1
@@ -34,7 +32,10 @@ if [ "${main_dir}" == %{name} ];then
 fi
 cd %{name}-%{version}
 chmod -R a+rX,u+w,g-w,o-w .
- 
+
+# Add debug package
+%debug_package
+
 %build
 cd $RPM_BUILD_DIR/../SPECS/
 [ ! -e kiodump ] && install -d kiodump
@@ -113,6 +114,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Wed Jan 17 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-4
+- Add debug_package
+
 * Mon Sep 25 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-3
 - Add BuildRequires: elfutils-devel
 

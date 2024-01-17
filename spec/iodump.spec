@@ -1,11 +1,9 @@
 %global __os_install_post %{nil}
 %define _ignore_post_scripts_errors %{nil}
-%define _enable_debug_packages %{nil}
-%define debug_package  %{nil}
 %define current_kver   %{?kver}%{!?kver:%(rpm -qa kernel-devel | head -n 1 | sed 's/^kernel-devel-//')}
 %define kver_name      %(echo %{current_kver} | awk -F. '{print substr($0,0,index($0,$(NF-1))-2)}')
 %define bare_name      iodump
-%define anolis_release 3
+%define anolis_release 4
 
 Name:                  %{bare_name}-%{kver_name}
 Version:               1.0.1
@@ -36,7 +34,10 @@ if [ "${main_dir}" == %{bare_name} ];then
 fi
 cd %{bare_name}-%{version}
 chmod -R a+rX,u+w,g-w,o-w .
- 
+
+# Add debug package
+%debug_package
+
 %build
 cd %{bare_name}-%{version}
 make
@@ -98,6 +99,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Wed Jan 17 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-4
+- Add debug_package
+
 * Mon Sep 25 2023 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-3
 - Add BuildRequires: elfutils-devel
 
