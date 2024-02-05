@@ -1,11 +1,9 @@
 %global __os_install_post %{nil}
 %define _ignore_post_scripts_errors %{nil}
-%define _enable_debug_packages %{nil}
-%define debug_package  %{nil}
 %define current_kver   %{?kver}%{!?kver:%(rpm -qa kernel-devel | head -n 1 | sed 's/^kernel-devel-//')}
 %define kver_name      %(echo %{current_kver} | awk -F. '{print substr($0,0,index($0,$(NF-1))-2)}')
 %define bare_name      iodump
-%define anolis_release 4
+%define anolis_release 5
 
 Name:                  %{bare_name}-%{kver_name}
 Version:               1.0.1
@@ -19,6 +17,9 @@ Source0:               %{bare_name}-%{version}.tar.gz
 Vendor:                Alibaba
 
 BuildRequires: elfutils-devel
+
+# Add debug package
+%debug_package
 
 %description
 dump the io details 
@@ -98,6 +99,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Mon Feb 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-5
+- Add debug_package
+
 * Mon Feb 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-4
 - Fix crash when executing mkfs.xfs
 

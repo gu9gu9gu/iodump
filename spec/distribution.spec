@@ -1,9 +1,7 @@
 %global __os_install_post %{nil}
 %define _ignore_post_scripts_errors %{nil}
-%define _enable_debug_packages %{nil}
-%define debug_package  %{nil}
 %define all_kver       %(ls /usr/src/kernels/ | cat)
-%define anolis_release 4
+%define anolis_release 5
 
 Name:                  iodump
 Version:               1.0.1
@@ -17,6 +15,9 @@ Source0:               %{name}-%{version}.tar.gz
 Vendor:                Alibaba
 
 BuildRequires: elfutils-devel
+
+# Add debug package
+%debug_package
 
 %description
 dump the io details 
@@ -111,6 +112,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Mon Feb 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-5
+- Add debug_package
+
 * Mon Feb 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-4
 - Fix crash when executing mkfs.xfs
 
