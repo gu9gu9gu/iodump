@@ -448,11 +448,7 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 
 	bv_page = (struct page *)(bio->bi_io_vec[0].bv_page);
 
-	if (IS_ERR_OR_NULL(bv_page) || PageSlab(bv_page) || PageSwapCache(bv_page))
-		goto end;
-
-	addr_space = (struct address_space *)(bv_page->mapping);
-	if (IS_ERR_OR_NULL(addr_space))
+	if (IS_ERR_OR_NULL(bv_page) || PageSlab(bv_page) || PageSwapCache(bv_page) || (!virt_addr_valid(bv_page)))
 		goto end;
 
 	if (PageAnon(bv_page)) {
@@ -463,7 +459,7 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 		}
 
 		iocb = (struct kiocb *)iomap_dio->iocb;
-		if (IS_ERR_OR_NULL(iocb)) {
+		if (IS_ERR_OR_NULL(iocb) || (!virt_addr_valid(iocb))) {
 			goto end;
 		}
 
@@ -480,6 +476,10 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 			*inode = (struct inode *)dio->inode;
 #endif
 	} else {
+		addr_space = (struct address_space *)(bv_page->mapping);
+		if (IS_ERR_OR_NULL(addr_space))
+			goto end;
+
 		*inode = addr_space->host;
 	}
 
