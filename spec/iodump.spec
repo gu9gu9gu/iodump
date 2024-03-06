@@ -3,7 +3,7 @@
 %define current_kver   %{?kver}%{!?kver:%(rpm -qa kernel-devel | head -n 1 | sed 's/^kernel-devel-//')}
 %define kver_name      %(echo %{current_kver} | awk -F. '{print substr($0,0,index($0,$(NF-1))-2)}')
 %define bare_name      iodump
-%define anolis_release 5
+%define anolis_release 6
 
 Name:                  %{bare_name}-%{kver_name}
 Version:               1.0.1
@@ -99,6 +99,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Tue Mar 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-6
+- Fix crash when executing mkfs.xfs
+
 * Mon Feb 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-5
 - Add debug_package
 

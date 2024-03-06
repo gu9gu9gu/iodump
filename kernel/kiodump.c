@@ -371,7 +371,7 @@ void inode2vfsmount(struct inode *inode, struct vfsmount **vfsmnt)
 	head = &(inode->i_sb->s_mounts);
 	if (IS_ERR_OR_NULL(head))
 		return;
-	for (pos = head->next; pos != head; pos = pos->next) {
+	for (pos = head->next; pos != head && !IS_ERR_OR_NULL(pos); pos = pos->next) {
 		mnt = container_of(pos, struct mount, mnt_instance);
 		if (!IS_ERR_OR_NULL(mnt)) {
 			*vfsmnt = &(mnt->mnt);
@@ -435,7 +435,7 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 		goto end;
 	if (!bio->bi_vcnt)
 		bio = (struct bio *)bio->bi_private;   // bio chain
-	if (IS_ERR_OR_NULL(bio))
+	if (IS_ERR_OR_NULL(bio) || (!virt_addr_valid(bio)))
 		goto end;
 	if (!bio->bi_vcnt)
 		goto end;
@@ -446,15 +446,18 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 #endif
 		goto end;
 
+	if (IS_ERR_OR_NULL(bio->bi_io_vec) || (!virt_addr_valid(bio->bi_io_vec)))
+		goto end;
+
 	bv_page = (struct page *)(bio->bi_io_vec[0].bv_page);
 
-	if (IS_ERR_OR_NULL(bv_page) || PageSlab(bv_page) || PageSwapCache(bv_page) || (!virt_addr_valid(bv_page)))
+	if (IS_ERR_OR_NULL(bv_page) || PageSlab(bv_page) || PageSwapCache(bv_page))
 		goto end;
 
 	if (PageAnon(bv_page)) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)
 		iomap_dio = (struct iomap_dio  *)bio->bi_private;
-		if (IS_ERR_OR_NULL(iomap_dio)) {
+		if (IS_ERR_OR_NULL(iomap_dio) || (!virt_addr_valid(iomap_dio))) {
 			goto end;
 		}
 
@@ -477,7 +480,7 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 #endif
 	} else {
 		addr_space = (struct address_space *)(bv_page->mapping);
-		if (IS_ERR_OR_NULL(addr_space))
+		if (IS_ERR_OR_NULL(addr_space) || !virt_addr_valid(addr_space))
 			goto end;
 
 		*inode = addr_space->host;

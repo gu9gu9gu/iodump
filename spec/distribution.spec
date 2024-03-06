@@ -1,7 +1,7 @@
 %global __os_install_post %{nil}
 %define _ignore_post_scripts_errors %{nil}
 %define all_kver       %(ls /usr/src/kernels/ | cat)
-%define anolis_release 5
+%define anolis_release 6
 
 Name:                  iodump
 Version:               1.0.1
@@ -112,6 +112,9 @@ if [ "$1" = "0" ]; then
 fi
 
 %changelog
+* Tue Mar 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-6
+- Fix crash when executing mkfs.xfs
+
 * Mon Feb 05 2024 wangxiaomeng <wangxiaomeng@kylinos.cn> - 1.0.1-5
 - Add debug_package
 
