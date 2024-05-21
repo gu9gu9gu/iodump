@@ -433,19 +433,21 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 
 	if (IS_ERR_OR_NULL(bio))
 		goto end;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+	if (bio->bi_iter.bi_size <= 0)
+		goto end;
+	if (!bio->bi_iter.bi_sector)
+		goto end;
+#else
 	if (!bio->bi_vcnt)
 		bio = (struct bio *)bio->bi_private;   // bio chain
 	if (IS_ERR_OR_NULL(bio) || (!virt_addr_valid(bio)))
 		goto end;
 	if (!bio->bi_vcnt)
 		goto end;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
-	if (!bio->bi_iter.bi_sector)
-#else
 	if (!bio->bi_sector)
-#endif
 		goto end;
-
+#endif
 	if (IS_ERR_OR_NULL(bio->bi_io_vec) || (!virt_addr_valid(bio->bi_io_vec)))
 		goto end;
 
