@@ -433,19 +433,21 @@ static struct inode *bio2inode(struct bio *bio, struct inode **inode)
 
 	if (IS_ERR_OR_NULL(bio))
 		goto end;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
+	if (bio->bi_iter.bi_size <= 0)
+		goto end;
+	if (!bio->bi_iter.bi_sector)
+		goto end;
+#else
 	if (!bio->bi_vcnt)
 		bio = (struct bio *)bio->bi_private;   // bio chain
 	if (IS_ERR_OR_NULL(bio) || (!virt_addr_valid(bio)))
 		goto end;
 	if (!bio->bi_vcnt)
 		goto end;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
-	if (!bio->bi_iter.bi_sector)
-#else
 	if (!bio->bi_sector)
-#endif
 		goto end;
-
+#endif
 	if (IS_ERR_OR_NULL(bio->bi_io_vec) || (!virt_addr_valid(bio->bi_io_vec)))
 		goto end;
 
@@ -579,6 +581,99 @@ static char blk_primary_rw(unsigned int op)
 	return rwchar;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+/*
+ * FROM https://elixir.bootlin.com/linux/v5.15.159/source/block/blk-core.c#L1267
+ */
+int get_partno_512(struct gendisk *gd, struct block_device *bdev)
+{
+	struct block_device *part;
+
+	if (bdev)
+		part = bdev;
+	else if (gd)
+		part = gd->part0;
+
+	if (part)
+		return part->bd_partno;
+
+	return 0;
+}
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0) \
+	|| (DISTRIBUTION == DISTRIBUTION_CENTOS && RHEL_MAJOR == 8 && RHEL_MINOR >= 4)
+/*
+ * FROM https://elixir.bootlin.com/linux/v5.11.22/source/block/genhd.c#L310
+ */
+static inline sector_t part_nr_sects_read(struct hd_struct *part)
+{
+#if BITS_PER_LONG==32 && defined(CONFIG_SMP)
+	sector_t nr_sects;
+	unsigned seq;
+	do {
+		seq = read_seqcount_begin(&part->nr_sects_seq);
+		nr_sects = part->nr_sects;
+	} while (read_seqcount_retry(&part->nr_sects_seq, seq));
+	return nr_sects;
+#elif BITS_PER_LONG==32 && defined(CONFIG_PREEMPTION)
+	sector_t nr_sects;
+
+	preempt_disable();
+	nr_sects = part->nr_sects;
+	preempt_enable();
+	return nr_sects;
+#else
+	return part->nr_sects;
+#endif
+}
+
+static inline int hd_struct_try_get(struct hd_struct *part)
+{
+	if (part->partno)
+		return percpu_ref_tryget_live(&part->ref);
+	return 1;
+}
+
+
+static inline int sector_in_part(struct hd_struct *part, sector_t sector)
+{
+	return part->start_sect <= sector &&
+		sector < part->start_sect + part_nr_sects_read(part);
+}
+
+struct hd_struct *disk_map_sector_rcu_57(struct gendisk *disk, sector_t sector)
+{
+	struct disk_part_tbl *ptbl;
+	struct hd_struct *part;
+	int i;
+
+	rcu_read_lock();
+	ptbl = rcu_dereference(disk->part_tbl);
+
+	part = rcu_dereference(ptbl->last_lookup);
+	if (part && sector_in_part(part, sector) && hd_struct_try_get(part))
+		goto out_unlock;
+
+	for (i = 1; i < ptbl->len; i++) {
+		part = rcu_dereference(ptbl->part[i]);
+
+		if (part && sector_in_part(part, sector)) {
+			if (!hd_struct_try_get(part))
+				break;
+			rcu_assign_pointer(ptbl->last_lookup, part);
+			goto out_unlock;
+		}
+	}
+
+	part = &disk->part0;
+out_unlock:
+	rcu_read_unlock();
+	return part;
+}
+
+#endif
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
 static int get_partno(struct block_device *bdev)
 {
@@ -611,20 +706,28 @@ static int get_partno(struct block_device *bdev)
 
 static int get_effective_partno(struct gendisk *gendisk, sector_t sector)
 {
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0))\
+	|| (DISTRIBUTION == DISTRIBUTION_CENTOS && RHEL_MAJOR == 8 && RHEL_MINOR >= 4)
 	int partno;
+	struct hd_struct    *hd;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0) \
-	 || (DISTRIBUTION == DISTRIBUTION_CENTOS && RHEL_MAJOR == 8 && RHEL_MINOR >= 4)
-	partno = 0;                // To be perfect
-#else
+	partno = 0;
+	hd = disk_map_sector_rcu_57(gendisk, sector);
+	if (hd)
+		partno = hd->partno;
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(5, 7, 0)
+	int partno;
 	struct hd_struct    *hd;
 
 	partno = 0;
 	hd = disk_map_sector_rcu(gendisk, sector);
 	if (hd)
 		partno = hd->partno;
-#endif
+#else
+	int partno;
+	partno = 0;
 
+#endif
 	return partno;
 }
 
@@ -754,6 +857,11 @@ static void blk_trace_general(struct bio *bio, struct ioinfo_t *iit)
 	if (!partno)
 		partno  = get_partno(bdev);
 #endif                                                                                                          // end  :      get_partno
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)                                                              // start:      get_partno_512
+	if (!partno)
+		partno = get_partno_512(gendisk, bdev);
+#endif                                                                                                          // end  :      get_partno_512
 #endif                                                                                                          // end  :  get_gendisk
 
 	if (IS_ERR_OR_NULL(gendisk))
@@ -766,14 +874,14 @@ static void blk_trace_general(struct bio *bio, struct ioinfo_t *iit)
 	if (!strstr(partition, disk_partition))
 		return;
 
-        if (step_sampling_replica > 1) {
+	if (step_sampling_replica > 1) {
 		if (atomic64_read(&step_counter) > (LONG_MAX - 10))
 			atomic64_set(&step_counter, 0);
 
 		atomic64_inc(&step_counter);
 		if (atomic64_read(&step_counter) % step_sampling_replica)
 			return;
-        }
+	}
 
 	if ((opts_flag & OPTS_TIMESTAMP) || (opts_flag & OPTS_DATETIME)) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 6, 0)
@@ -1027,12 +1135,17 @@ static int clean_trace_release(struct inode *inode, struct file *file)
 #else
 	tracepoint_probe_unregister(probe_point_name, probe_point_func);
 #endif
+#if !defined(CONFIG_PREEMPT_COUNT)
 	tracepoint_synchronize_unregister();
+#endif
 	pr_info("tracepoint %s unregister success in debugfs.\n", probe_point_name);
 
 	enable = 0;
 	spin_unlock(&trace_lock);
 
+#if defined(CONFIG_PREEMPT_COUNT)
+	tracepoint_synchronize_unregister();
+#endif
 	pr_err("close debugfs %d %s\n", current->pid, current->comm);
 
 	return 0;
@@ -1156,7 +1269,7 @@ int param_set_func(const char *val,       struct kernel_param *kp)
 			pr_info("match comm enabled, %s\n", match_comm_replica);
 		}
 
-                step_sampling_replica = step_sampling;
+		step_sampling_replica = step_sampling;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
 		for_each_kernel_tracepoint(find_tracepoint, NULL);
@@ -1186,8 +1299,19 @@ int param_set_func(const char *val,       struct kernel_param *kp)
 #else
 		tracepoint_probe_unregister(probe_point_name, probe_point_func);
 #endif
+#if !defined(CONFIG_PREEMPT_COUNT)
 		tracepoint_synchronize_unregister();
+#endif
 		spin_unlock(&trace_lock);
+/*
+ * https://elixir.bootlin.com/linux/v6.8.10/source/kernel/sched/core.c#L5969
+ * https://lore.kernel.org/all/1307555315-30989-3-git-send-email-fweisbec@gmail.com/
+ *
+ * Can this be entirely moved outside the spinlock?
+ */
+#if defined(CONFIG_PREEMPT_COUNT)
+		tracepoint_synchronize_unregister();
+#endif
 
 		pr_info("tracepoint %s unregister success.\n", probe_point_name);
 	} else {
@@ -1315,9 +1439,14 @@ void __exit oshealth_exit(void)
 	if (ret)
 		pr_err("tracepoint %s unregister is fail, errcode is %d .\n", probe_point_name, ret);
 #endif
+#if !defined(CONFIG_PREEMPT_COUNT)
 	tracepoint_synchronize_unregister();
-
+#endif
 	spin_unlock(&trace_lock);
+
+#if defined(CONFIG_PREEMPT_COUNT)
+	tracepoint_synchronize_unregister();
+#endif
 	pr_info("tracepoint %s unregister success.\n", probe_point_name);
 
 umount:
